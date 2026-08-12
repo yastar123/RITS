@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@/lib/route";
 
 import aboutImg from "@/assets/about-herbs.jpg";
 import { PageHeader } from "@/components/site/PageHeader";

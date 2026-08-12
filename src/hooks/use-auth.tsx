@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User } from "@supabase/supabase-js";
+export type User = { id: string; email: string };
 
 export interface AuthContextValue {
   user: User | null;
@@ -25,36 +24,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (isMounted && !error) {
-        setUser(data.user ?? null);
-      }
-      setIsLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return;
-      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        setUser(session?.user ?? null);
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-        queryClient.cancelQueries();
-        queryClient.clear();
-      } else if (event === "INITIAL_SESSION") {
-        setUser(session?.user ?? null);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      listener.subscription.unsubscribe();
-    };
+    fetch("/api/auth/me", { headers: authHeaders() })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { user?: User } | null) => { if (isMounted) setUser(data?.user ?? null); })
+      .catch(() => { if (isMounted) setUser(null); })
+      .finally(() => { if (isMounted) setIsLoading(false); });
+    return () => { isMounted = false; };
   }, [queryClient]);
 
   const signOut = async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST", headers: authHeaders() });
+    setUser(null);
   };
 
   return (
@@ -79,10 +61,15 @@ export function useProfile() {
   return useQuery({
     queryKey: ["profile", "me"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").single();
-      if (error) throw error;
-      return data;
+      const response = await fetch("/api/profile", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Gagal memuat profil");
+      return response.json();
     },
     enabled: !!useAuth().user,
   });
+}
+
+export function authHeaders(): HeadersInit {
+  const token = typeof window !== "undefined" ? window.localStorage.getItem("auth_token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }

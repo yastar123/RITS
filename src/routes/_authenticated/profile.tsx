@@ -1,9 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@/lib/route";
 import { useEffect, useState } from "react";
 import { useProfile } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -28,21 +27,7 @@ function ProfilePage() {
       setTonguePhotoUrl(null);
       return;
     }
-    const path = new URL(profile.tongue_photo_url).pathname.split("/tongue-photos/")[1];
-    if (!path) {
-      setTonguePhotoUrl(profile.tongue_photo_url);
-      return;
-    }
-    supabase.storage
-      .from("tongue-photos")
-      .createSignedUrl(path, 60 * 60)
-      .then(({ data, error }) => {
-        if (!error && data?.signedUrl) {
-          setTonguePhotoUrl(data.signedUrl);
-        } else {
-          setTonguePhotoUrl(profile.tongue_photo_url);
-        }
-      });
+    setTonguePhotoUrl(profile.tongue_photo_url);
   }, [profile?.tongue_photo_url]);
 
   return (

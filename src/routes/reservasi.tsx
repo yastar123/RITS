@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@/lib/route";
 import { useState } from "react";
 import { CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -63,16 +63,20 @@ function Reservasi() {
   const canContinue =
     step === 0 ? Boolean(form.service) : step === 1 ? Boolean(form.date && form.time) : true;
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (step < steps.length - 1) {
       if (canContinue) setStep(step + 1);
       return;
     }
-    setResult(saveReservation({ ...form }));
-    setForm(emptyForm);
-    setStep(0);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      setResult(await saveReservation({ ...form }));
+      setForm(emptyForm);
+      setStep(0);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      window.alert("Reservasi gagal disimpan. Pastikan koneksi database sudah tersedia.");
+    }
   }
 
   return (

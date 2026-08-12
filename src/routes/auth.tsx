@@ -1,12 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@/lib/route";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Upload, Camera, User, Mail, Lock, Phone, MapPin, Hash, Ruler, Weight, LocateFixed } from "lucide-react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
-import { signInWithEmail, signUpWithProfile } from "@/lib/auth.functions";
-import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,8 +78,6 @@ function AuthPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<FormField, string>>({ ...initialValues });
 
-  const signIn = useServerFn(signInWithEmail);
-  const signUp = useServerFn(signUpWithProfile);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -144,34 +138,14 @@ function AuthPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const bucketName = "tongue-photos";
-    const fileName = `public/${Date.now()}-${file.name}`;
-    const { data, error } = await supabase.storage.from(bucketName).upload(fileName, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-
-    if (error) {
-      setErrors((prev) => ({ ...prev, tongue_photo_url: error.message }));
+    if (file.size > 2_000_000) {
+      setErrors((prev) => ({ ...prev, tongue_photo_url: "Ukuran foto maksimal 2 MB." }));
       return;
     }
-
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(data.path);
-    setValues((prev) => ({ ...prev, tongue_photo_url: urlData.publicUrl }));
+    const reader = new FileReader();
+    reader.onload = () => setValues((prev) => ({ ...prev, tongue_photo_url: String(reader.result ?? "") }));
+    reader.readAsDataURL(file);
     setErrors((prev) => ({ ...prev, tongue_photo_url: "" }));
-  };
-
-  const handleGoogle = async () => {
-    setFormError(null);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-
-    if (result.error) {
-      setFormError(result.error instanceof Error ? result.error.message : "Gagal masuk dengan Google");
-    } else if (result.redirected) {
-      return;
-    }
   };
 
   const validate = () => {
@@ -199,34 +173,25 @@ function AuthPage() {
     setIsSubmitting(true);
 
     try {
-      const result =
-        mode === "login"
-          ? await signIn({ data: { email: values.email, password: values.password } })
-          : await (async () => {
-              await signUp({
-                data: {
-                  email: values.email,
-                  password: values.password,
-                  profile: {
-                    full_name: values.full_name,
-                    gender: values.gender as "Laki-laki" | "Perempuan",
-                    age: Number(values.age),
-                    height: Number(values.height),
-                    weight: Number(values.weight),
-                    phone: values.phone,
-                    address: values.address,
-                    referral_code: values.referral_code || undefined,
-                    tongue_photo_url: values.tongue_photo_url || undefined,
-                  },
-                },
-              });
-              return await signIn({ data: { email: values.email, password: values.password } });
-            })();
-
-      await supabase.auth.setSession({
-        access_token: result.access_token,
-        refresh_token: result.refresh_token,
+      if (mode === "register") {
+        const signup = await fetch("/api/auth/signup", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: values.email, password: values.password, profile: {
+            full_name: values.full_name, gender: values.gender, age: Number(values.age),
+            height: Number(values.height), weight: Number(values.weight), phone: values.phone,
+            address: values.address, referral_code: values.referral_code,
+          } }),
+        });
+        if (!signup.ok) throw new Error((await signup.json()).message ?? "Gagal membuat akun");
+      }
+      const login = await fetch("/api/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: values.email, password: values.password }),
       });
+      const result = await login.json();
+      if (!login.ok) throw new Error(result.message ?? "Email atau password salah");
+      window.localStorage.setItem("auth_token", result.token);
+      window.location.assign("/dashboard");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
@@ -284,7 +249,7 @@ function AuthPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={handleGoogle}
+            onClick={() => setFormError("Login Google belum tersedia pada autentikasi lokal. Gunakan email dan password.")}
             className="mb-6 w-full justify-center gap-2 border-border py-5"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">

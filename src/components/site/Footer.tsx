@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from "@/lib/route";
 
 import { navItems } from "./Header";
 

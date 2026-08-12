@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@/lib/route";
 import { useState } from "react";
 import { SearchX } from "lucide-react";
 
@@ -35,9 +35,9 @@ function CekReservasi() {
 
       <section className="mx-auto max-w-3xl px-4 py-14 sm:px-5 sm:py-20">
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            setFound(findReservation(query) ?? null);
+            setFound((await findReservation(query)) ?? null);
             setSearched(true);
           }}
           className="flex flex-col gap-3 sm:flex-row"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@/lib/route";
 import { PageHeader } from "@/components/site/PageHeader";
 
 export const Route = createFileRoute("/_authenticated/skrining")({

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@/lib/route";
 import { Phone, MapPin, Clock, MessageCircle } from "lucide-react";
 
 import { PageHeader } from "@/components/site/PageHeader";

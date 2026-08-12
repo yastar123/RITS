@@ -68,32 +68,21 @@ export function formatPrice(value: number) {
   }).format(value);
 }
 
-export function loadReservations(): Reservation[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as Reservation[];
-  } catch {
-    return [];
-  }
+export async function saveReservation(data: Omit<Reservation, "code" | "status" | "createdAt">) {
+  const response = await fetch("/api/reservations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message ?? "Gagal menyimpan reservasi");
+  return result as Reservation;
 }
 
-export function saveReservation(data: Omit<Reservation, "code" | "status" | "createdAt">) {
-  const reservation: Reservation = {
-    ...data,
-    code: `RIS-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
-    status: "Menunggu Konfirmasi",
-    createdAt: new Date().toISOString(),
-  };
-  const all = loadReservations();
-  all.unshift(reservation);
-  window.localStorage.setItem(KEY, JSON.stringify(all));
-  return reservation;
-}
-
-export function findReservation(query: string): Reservation | undefined {
+export async function findReservation(query: string): Promise<Reservation | undefined> {
   const q = query.trim().toLowerCase();
   if (!q) return undefined;
-  return loadReservations().find(
-    (r) => r.code.toLowerCase() === q || r.phone.replace(/\s/g, "") === q.replace(/\s/g, ""),
-  );
+  const response = await fetch(`/api/reservations?query=${encodeURIComponent(q)}`);
+  if (!response.ok) throw new Error("Gagal mencari reservasi");
+  return (await response.json()) ?? undefined;
 }
