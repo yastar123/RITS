@@ -4,6 +4,7 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("user"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -39,4 +40,16 @@ export const reservations = pgTable("reservations", {
   note: text("note"),
   status: text("status").notNull().default("Menunggu Konfirmasi"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const articles = pgTable("articles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  excerpt: text("excerpt").notNull(),
+  content: text("content").notNull(),
+  readTime: text("read_time").notNull().default("5 menit"),
+  publishedAt: timestamp("published_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

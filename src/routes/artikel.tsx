@@ -1,6 +1,6 @@
 import { createFileRoute } from "@/lib/route";
-
 import { PageHeader } from "@/components/site/PageHeader";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/artikel")({
   head: () => ({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/artikel")({
   component: Artikel,
 });
 
-const articles = [
+const fallbackArticles = [
   {
     cat: "Akupunktur",
     title: "Apa yang sebenarnya terjadi saat jarum masuk?",
@@ -66,6 +66,25 @@ const articles = [
 ];
 
 function Artikel() {
+  const [articles, setArticles] = useState(fallbackArticles);
+
+  useEffect(() => {
+    fetch("/api/articles")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Gagal memuat artikel")))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setArticles(data.map((article) => ({
+            cat: article.category,
+            title: article.title,
+            excerpt: article.excerpt,
+            date: new Intl.DateTimeFormat("id-ID", { dateStyle: "long" }).format(new Date(article.publishedAt)),
+            read: article.readTime,
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <>
       <PageHeader

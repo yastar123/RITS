@@ -18,6 +18,14 @@ Dependensi proyek diinstal dari `package-lock.json`. Database PostgreSQL develop
 npm run db:push
 ```
 
+Untuk menyiapkan akun administrator dan artikel awal setelah schema dibuat, jalankan:
+
+```bash
+npm run db:seed
+```
+
+Gunakan `ADMIN_EMAIL` (opsional, default `admin@rumahterapy.id`) dan secret `ADMIN_PASSWORD` minimal 8 karakter. Dashboard admin tersedia di `/admin`.
+
 ## User preferences
 
 - Pertahankan struktur dan stack proyek yang sudah ada.

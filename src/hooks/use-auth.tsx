@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-export type User = { id: string; email: string };
+export type User = { id: string; email: string; role: string };
 
 export interface AuthContextValue {
   user: User | null;

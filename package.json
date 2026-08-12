@@ -8,6 +8,7 @@
     "build": "vite build",
     "start": "tsx server/index.ts",
     "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

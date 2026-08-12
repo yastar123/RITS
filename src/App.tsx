@@ -14,6 +14,8 @@ import { Route as AuthRoute } from "@/routes/auth";
 import { Route as DashboardRoute } from "@/routes/_authenticated/dashboard";
 import { Route as ProfileRoute } from "@/routes/_authenticated/profile";
 import { Route as ScreeningRoute } from "@/routes/_authenticated/skrining";
+import { Route as AdminLoginRoute } from "@/routes/admin-login";
+import { Route as AdminRoute } from "@/routes/admin";
 
 function Page({ route }: { route: { component: React.ComponentType } }) {
   const Component = route.component;
@@ -22,9 +24,15 @@ function Page({ route }: { route: { component: React.ComponentType } }) {
 
 function Shell() {
   const location = useLocation();
-  const bare = location.pathname === "/auth";
+  const bare = location.pathname === "/auth" || location.pathname.startsWith("/admin");
   return bare ? (
-    <Page route={AuthRoute} />
+    <Routes>
+      <Route path="/auth" element={<Page route={AuthRoute} />} />
+      <Route path="/admin/login" element={<Page route={AdminLoginRoute} />} />
+      <Route element={<AdminProtectedRoutes />}>
+        <Route path="/admin" element={<Page route={AdminRoute} />} />
+      </Route>
+    </Routes>
   ) : (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -55,6 +63,14 @@ function Shell() {
       </Link>
     </div>
   );
+}
+
+function AdminProtectedRoutes() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/admin/login" replace />;
+  if (user.role !== "admin") return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
 }
 
 function ProtectedRoutes() {

@@ -1,11 +1,11 @@
 import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { and, eq, or } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { getDb } from "./db";
-import { profiles, reservations, sessions, users } from "./db/schema";
+import { articles, profiles, reservations, sessions, users } from "./db/schema";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -27,6 +27,16 @@ async function requireUser(req: express.Request, res: express.Response) {
     res.status(401).json({ message: "Sesi telah berakhir." }); return null;
   }
   return result[0].user;
+}
+
+async function requireAdmin(req: express.Request, res: express.Response) {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  if (user.role !== "admin") {
+    res.status(403).json({ message: "Akses admin diperlukan." });
+    return null;
+  }
+  return user;
 }
 
 function validateProfile(input: Record<string, unknown>) {
@@ -57,7 +67,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user || !(await bcrypt.compare(String(req.body.password), user.passwordHash))) return res.status(401).json({ message: "Email atau password salah." });
     const token = randomBytes(32).toString("hex");
     await db.insert(sessions).values({ token, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
   } catch (error) { res.status(500).json({ message: error instanceof Error ? error.message : "Gagal masuk." }); }
 });
 
@@ -97,6 +107,143 @@ app.get("/api/reservations", async (req, res) => {
     const result = await getDb().select().from(reservations).where(or(eq(reservations.code, query.toUpperCase()), eq(reservations.phone, normalized))).limit(1);
     res.json(result[0] ?? null);
   } catch (error) { res.status(503).json({ message: error instanceof Error ? error.message : "Database belum siap." }); }
+});
+
+app.get("/api/articles", async (_req, res) => {
+  try {
+    const result = await getDb().select().from(articles).orderBy(desc(articles.publishedAt), desc(articles.createdAt));
+    res.json(result);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal memuat artikel." });
+  }
+});
+
+app.get("/api/admin/reservations", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const query = String(req.query.query ?? "").trim().toLowerCase();
+    const result = await getDb().select().from(reservations).orderBy(desc(reservations.createdAt));
+    res.json(query
+      ? result.filter((item) => [item.code, item.name, item.phone, item.service, item.status].some((value) => value.toLowerCase().includes(query)))
+      : result);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal memuat reservasi." });
+  }
+});
+
+app.post("/api/admin/reservations", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const { name, phone, service, date, time, note, status } = req.body as Record<string, unknown>;
+    if (![name, phone, service, date, time].every((value) => String(value ?? "").trim())) {
+      return res.status(400).json({ message: "Nama, nomor telepon, layanan, tanggal, dan waktu wajib diisi." });
+    }
+    const [reservation] = await getDb().insert(reservations).values({
+      code: `RIS-${randomBytes(3).toString("hex").toUpperCase()}`,
+      name: String(name).trim(),
+      phone: String(phone).trim(),
+      service: String(service).trim(),
+      date: String(date),
+      time: String(time),
+      note: note ? String(note).trim() : null,
+      status: status ? String(status) : "Menunggu Konfirmasi",
+    }).returning();
+    res.status(201).json(reservation);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal membuat reservasi." });
+  }
+});
+
+app.patch("/api/admin/reservations/:id", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const { name, phone, service, date, time, note, status } = req.body as Record<string, unknown>;
+    if (![name, phone, service, date, time].every((value) => String(value ?? "").trim())) {
+      return res.status(400).json({ message: "Nama, nomor telepon, layanan, tanggal, dan waktu wajib diisi." });
+    }
+    const [reservation] = await getDb().update(reservations).set({
+      name: String(name).trim(),
+      phone: String(phone).trim(),
+      service: String(service).trim(),
+      date: String(date),
+      time: String(time),
+      note: note ? String(note).trim() : null,
+      status: status ? String(status) : "Menunggu Konfirmasi",
+    }).where(eq(reservations.id, req.params.id)).returning();
+    if (!reservation) return res.status(404).json({ message: "Reservasi tidak ditemukan." });
+    res.json(reservation);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal memperbarui reservasi." });
+  }
+});
+
+app.delete("/api/admin/reservations/:id", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const [reservation] = await getDb().delete(reservations).where(eq(reservations.id, req.params.id)).returning({ id: reservations.id });
+    if (!reservation) return res.status(404).json({ message: "Reservasi tidak ditemukan." });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal menghapus reservasi." });
+  }
+});
+
+function validateArticle(input: Record<string, unknown>) {
+  return ["category", "title", "excerpt", "content", "readTime"].every(
+    (key) => typeof input[key] === "string" && String(input[key]).trim(),
+  );
+}
+
+app.post("/api/admin/articles", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    if (!validateArticle(req.body)) return res.status(400).json({ message: "Lengkapi kategori, judul, ringkasan, isi, dan waktu baca." });
+    const input = req.body as Record<string, unknown>;
+    const [article] = await getDb().insert(articles).values({
+      category: String(input.category).trim(),
+      title: String(input.title).trim(),
+      excerpt: String(input.excerpt).trim(),
+      content: String(input.content).trim(),
+      readTime: String(input.readTime).trim(),
+      publishedAt: input.publishedAt ? new Date(String(input.publishedAt)) : new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    res.status(201).json(article);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal membuat artikel." });
+  }
+});
+
+app.patch("/api/admin/articles/:id", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    if (!validateArticle(req.body)) return res.status(400).json({ message: "Lengkapi kategori, judul, ringkasan, isi, dan waktu baca." });
+    const input = req.body as Record<string, unknown>;
+    const [article] = await getDb().update(articles).set({
+      category: String(input.category).trim(),
+      title: String(input.title).trim(),
+      excerpt: String(input.excerpt).trim(),
+      content: String(input.content).trim(),
+      readTime: String(input.readTime).trim(),
+      publishedAt: input.publishedAt ? new Date(String(input.publishedAt)) : new Date(),
+      updatedAt: new Date(),
+    }).where(eq(articles.id, req.params.id)).returning();
+    if (!article) return res.status(404).json({ message: "Artikel tidak ditemukan." });
+    res.json(article);
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal memperbarui artikel." });
+  }
+});
+
+app.delete("/api/admin/articles/:id", async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const [article] = await getDb().delete(articles).where(eq(articles.id, req.params.id)).returning({ id: articles.id });
+    if (!article) return res.status(404).json({ message: "Artikel tidak ditemukan." });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Gagal menghapus artikel." });
+  }
 });
 
 async function start() {
