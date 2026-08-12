@@ -72,7 +72,7 @@ function Artikel() {
     fetch("/api/articles")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Gagal memuat artikel")))
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setArticles(data.map((article) => ({
             cat: article.category,
             title: article.title,

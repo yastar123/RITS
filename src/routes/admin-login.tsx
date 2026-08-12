@@ -86,14 +86,14 @@ function AdminLoginPage() {
                 <Label htmlFor="admin-email">Email admin</Label>
                 <div className="relative">
                   <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="admin-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-9" placeholder="admin@rumahterapy.id" required />
+                  <Input id="admin-email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-9" placeholder="admin@rumahterapy.id" required />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="admin-password">Password</Label>
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-9" placeholder="Masukkan password admin" minLength={8} required />
+                  <Input id="admin-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-9" placeholder="Masukkan password admin" minLength={8} required />
                 </div>
               </div>
               {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
